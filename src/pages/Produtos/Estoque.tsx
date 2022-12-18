@@ -1,22 +1,35 @@
-import { Card, Chip, Dialog, DialogContent, DialogTitle, Table } from "@mui/material";
-import MUIDataTable, { MUIDataTableOptions } from "mui-datatables";
 import { SetStateAction, useContext, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import {
+  Card,
+  Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Table,
+  Accordion,
+  AccordionSummary,
+  Typography,
+  AccordionDetails
+} from "@mui/material";
+import MUIDataTable, { MUIDataTableOptions } from "mui-datatables";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronDown, faMinus } from '@fortawesome/free-solid-svg-icons';
+import { toast, ToastContainer } from "react-toastify";
+import { useNavigate } from "react-router-dom";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import Preloader from "../../components/preloader/Preloader";
+import Layout from "../../components/layout/Layout/Layout";
 import { useFetch } from "../../hooks/useFetch";
+import axios from "axios";
+import User from "../../models/User.model";
 import { HttpRequestType } from "../../models/HttpRequest.model";
 import { Produto } from "../../models/Produto.model";
-import axios from "axios";
 import { ResponseModel } from "../../models/Response.model";
-import { toast, ToastContainer } from "react-toastify";
-import Layout from "../../components/layout/Layout/Layout";
-import jwtDecode from "jwt-decode";
-import { useNavigate } from "react-router-dom";
-import User from "../../models/User.model";
 import { AuthContext } from "../../context/AuthContext";
 import CurrencyInput from 'react-currency-input-field';
-import CurrencyService from "../../services/CurrencyService";
+import jwtDecode from "jwt-decode";
 
+import CurrencyService from "../../services/CurrencyService";
 
 const EstoquePage = () => {
   const apiURL = import.meta.env.VITE_APIURL;
@@ -189,7 +202,7 @@ const EstoquePage = () => {
 
   const handleCloseEdit = () => {
     setProdutoEditing(new Produto());
-    reset();
+    resetEdit();
     setopenModalEditProduto(false);
   }
 
@@ -201,28 +214,72 @@ const EstoquePage = () => {
 
   const ModalEditarProdutoCancelar = () => {
     setProdutoEditing(new Produto());
-    reset();
+    resetEdit();
     setopenModalEditProduto(false);
   }
 
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { control, register, handleSubmit, reset, formState: { errors } } = useForm<{
+    controls: {
+      usuarioId: string,
+      codigo: string,
+      descricao: string,
+      tamanho: string,
+      genero: string,
+      cor: string,
+      marca: string,
+      estoque: string,
+      estoqueTotal: string,
+      precoDisplay: string
+    }[];
+  }>({
+    defaultValues: {
+      controls: [
+        {
+          usuarioId: '',
+          codigo: '',
+          descricao: '',
+          tamanho: '',
+          genero: '',
+          cor: '',
+          marca: '',
+          estoque: '',
+          estoqueTotal: '',
+          precoDisplay: ''
+        }
+      ],
+    },
+  });
+
+  const { fields, append, prepend, remove, swap, move, insert } = useFieldArray({
+    control, // control props comes from useForm (optional: if you are using FormContext)
+    name: "controls", // unique name for your Field Array
+  });
+
+  const { register: registerEdit, handleSubmit: handleSubmitEdit, reset: resetEdit, formState: { errors: errorsEdit } } = useForm();
 
 
   const onSubmit = async (values: any) => {
+    const campos = values.controls;
+    setisLoading(true);
+
     if (userData?.Id == undefined) {
       userData = JSON.parse(localStorage.getItem("AppUsuario") || "null") as User;
     }
-    values.usuarioId = userData?.Id;
-    values.preco = _currencyService.Formatar(values?.precoDisplay as string);
+
+    campos.forEach((formControl: any) => {
+      console.log(formControl);
+
+      formControl.usuarioId = userData?.Id;
+      formControl.preco = _currencyService.Formatar(formControl?.precoDisplay as string);
+    });
 
     await axios.post<ResponseModel<Produto[]>>(apiURL + '/produtos/cadastrar', {
-      data: values, validateStatus: function (status: number) {
+      data: campos, validateStatus: function (status: number) {
         return status < 500;
       }
     })
-      .then(async (response) => {
-        setisLoading(false);
+      .then(async (response: any) => {
         if (response.data.success) {
 
           toast.success(response.data.message ? response.data.message : "Sucesso!", {
@@ -237,7 +294,7 @@ const EstoquePage = () => {
             progress: undefined,
           });
           handleClose();
-          listarProdutos();
+
         } else {
           toast.error(response.data.message, {
             type: "error",
@@ -250,13 +307,11 @@ const EstoquePage = () => {
             draggable: true,
             progress: undefined,
           });
-          setisLoading(false);
-
         }
-
 
       }).catch((error: ResponseModel<any>) => {
         console.log(error.message);
+      }).finally(function () {
         setisLoading(false);
         listarProdutos();
       });
@@ -265,17 +320,18 @@ const EstoquePage = () => {
 
   const onSubmitEdit = async (values: any) => {
     setisLoading(true);
+
     if (userData?.Id == undefined) {
       userData = JSON.parse(localStorage.getItem("AppUsuario") || "null") as User;
     }
+
     values.usuarioId = userData?.Id;
     values.preco = _currencyService.Formatar(values?.precoDisplay as string);
 
     await axios.put<ResponseModel<any>>(apiURL + "/produtos/editar", {
       data: values
     })
-      .then((response) => {
-        setisLoading(false);
+      .then((response: any) => {
 
         if (response.data.success) {
           toast.success(response.data.message ? response.data.message : "Sucesso!", {
@@ -290,8 +346,7 @@ const EstoquePage = () => {
             progress: undefined,
           });
           handleCloseEdit();
-          reset();
-          listarProdutos();
+          resetEdit();
         } else {
 
           toast.error(response.data.message, {
@@ -305,14 +360,13 @@ const EstoquePage = () => {
             draggable: true,
             progress: undefined,
           });
-          listarProdutos();
-
-
         }
 
-
-      }).catch((error) => {
-
+      }).catch((error: ResponseModel<any>) => {
+        console.log(error.message);
+      }).finally(function () {
+        setisLoading(false);
+        listarProdutos();
       });
 
 
@@ -325,9 +379,9 @@ const EstoquePage = () => {
       return;
     } else {
       await axios.post<ResponseModel<Produto[]>>(apiURL + "/produtos/listar", { "id": userData?.Id })
-        .then((response) => {
+        .then((response: any) => {
           var novalista: Produto[] = [];
-          response.data.data?.map((prod) => {
+          response.data.data?.map((prod: any) => {
             novalista.push(prod);
           })
           setisLoading(false);
@@ -335,30 +389,31 @@ const EstoquePage = () => {
           setProdutos(novalista);
           handleClose();
           reset();
-        }).catch((error) => {
+          resetEdit();
+        }).catch((error: any) => {
           console.log(error);
           setisLoading(false);
         });
     }
-
-
-
   }
 
-
+  const removerProdutoCriar = (ev: any, index: number) => {
+    ev.stopPropagation();
+    fields.length == 1 ? '' : remove(index);
+  }
 
   async function selecionarProduto(id: number) {
 
     setisLoading(true);
     await axios.get<ResponseModel<Produto>>(apiURL + "/produtos/consultar/" + id)
-      .then(async (res) => {
+      .then(async (res: any) => {
 
         setIsPageLoading(false);
         setisLoading(false);
         ProdutoEditiingnew = res.data.data;
         setProdutoEditing(res.data.data);
 
-      }).catch((error) => {
+      }).catch((error: any) => {
         console.log(error);
       })
 
@@ -380,7 +435,7 @@ const EstoquePage = () => {
     axios.delete<ResponseModel<any>>(apiURL + '/produtos', {
       data: { "id": id }
     })
-      .then((res) => {
+      .then((res: any) => {
 
         if (res.data.success) {
 
@@ -412,7 +467,7 @@ const EstoquePage = () => {
           listarProdutos();
           setIsPageLoading(false);
         }
-      }).catch((error) => {
+      }).catch((error: any) => {
         console.log(error);
         setIsPageLoading(false);
       });
@@ -424,7 +479,7 @@ const EstoquePage = () => {
     axios.delete<ResponseModel<any>>(apiURL + '/produtos/deletarPorLista', {
       data: { "listaids": listaIds }
     })
-      .then((res) => {
+      .then((res: any) => {
 
         if (res.data.success) {
 
@@ -456,7 +511,7 @@ const EstoquePage = () => {
           listarProdutos();
           setIsPageLoading(false);
         }
-      }).catch((error) => {
+      }).catch((error: any) => {
         console.log(error);
         setIsPageLoading(false);
       });
@@ -528,34 +583,34 @@ const EstoquePage = () => {
             }
 
             {!isLoading &&
-              <form onSubmit={handleSubmit(onSubmitEdit)}>
+              <form onSubmit={handleSubmitEdit(onSubmitEdit)}>
                 <div className="row">
                   <div className="col-6 mb-3">
-                    <input {...register("Id")} type="hidden" value={ProdutoEditing?.Id} />
+                    <input {...registerEdit("Id")} type="hidden" value={ProdutoEditing?.Id} />
                     <label
                       htmlFor="exampleInputPassword1"
                       className="form-label"
                     >Código
                     </label>
                     <input
-                      {...register("codigo", { required: { value: true, message: "Campo Necessário!" } })}
+                      {...registerEdit("codigo", { required: { value: true, message: "Campo Necessário!" } })}
                       type="text"
                       defaultValue={ProdutoEditing?.codigo}
                       placeholder="Código"
-                      className={`form-control ${errors.codigo?.message != null ? "is-invalid" : ""}`}
+                      className={`form-control ${errorsEdit.codigo?.message != null ? "is-invalid" : ""}`}
                       id="exampleInputPassword1" />
-                    {errors.codigo && <p className="text-danger">{errors.codigo.message}</p>}
+                    {errorsEdit.codigo && <p className="text-danger">{errorsEdit.codigo.message}</p>}
                   </div>
                   <div className="col-6 mb-3">
                     <label htmlFor="exampleInputEmail1" className="form-label">Descrição</label>
-                    <input {...register("descricao", { required: { value: true, message: "Campo Necessário!" } })}
+                    <input {...registerEdit("descricao", { required: { value: true, message: "Campo Necessário!" } })}
                       type="text"
                       defaultValue={ProdutoEditing?.descricao}
                       placeholder="Descrição"
-                      className={`form-control ${errors.descricao?.message != null ? "is-invalid" : ""}`}
+                      className={`form-control ${errorsEdit.descricao?.message != null ? "is-invalid" : ""}`}
                       id="exampleInputEmail1"
                       aria-describedby="emailHelp" />
-                    {errors.descricao && <p className="text-danger">{errors.descricao?.message}</p>}
+                    {errorsEdit.descricao && <p className="text-danger">{errorsEdit.descricao?.message}</p>}
                   </div>
                 </div>
                 <div className="row">
@@ -564,10 +619,10 @@ const EstoquePage = () => {
                       className="form-label">Tamanho
                     </label>
                     <input
-                      {...register("tamanho", { required: { value: true, message: "Campo Necessário!" } })}
+                      {...registerEdit("tamanho", { required: { value: true, message: "Campo Necessário!" } })}
                       type="text"
                       defaultValue={ProdutoEditing?.tamanho}
-                      className={`form-control ${errors.tamanho?.message != null ? "is-invalid" : ""}`}
+                      className={`form-control ${errorsEdit.tamanho?.message != null ? "is-invalid" : ""}`}
                       placeholder="Tamanho"
                       id="exampleInputEmail1"
                       aria-describedby="emailHelp" />
@@ -575,8 +630,8 @@ const EstoquePage = () => {
                   <div className="col-3 mb-3">
                     <label htmlFor="exampleInputEmail1" className="form-label">Gênero</label>
                     <select
-                      {...register("genero", { required: { value: true, message: "Campo Necessário!" } })}
-                      className={`form-select ${errors.genero?.message != null ? "is-invalid" : ""}`}
+                      {...registerEdit("genero", { required: { value: true, message: "Campo Necessário!" } })}
+                      className={`form-select ${errorsEdit.genero?.message != null ? "is-invalid" : ""}`}
                       defaultValue={ProdutoEditing?.genero}
                     >
                       <option value=""  ></option>
@@ -584,7 +639,7 @@ const EstoquePage = () => {
                       <option value="FEMININO">Feminino</option>
                       <option value="SEM GENERO">Sem Gênero</option>
                     </select>
-                    {errors.genero && <p className="text-danger">{errors.genero?.message}</p>}
+                    {errorsEdit.genero && <p className="text-danger">{errorsEdit.genero?.message}</p>}
                   </div>
                   <div className="col-3 mb-3">
                     <label
@@ -593,10 +648,10 @@ const EstoquePage = () => {
                       Cor
                     </label>
                     <input
-                      {...register("cor", { required: { value: true, message: "Campo Necessário!" } })}
+                      {...registerEdit("cor", { required: { value: true, message: "Campo Necessário!" } })}
                       type="text"
                       defaultValue={ProdutoEditing?.cor}
-                      className={`form-control ${errors.cor?.message != null ? "is-invalid" : ""}`}
+                      className={`form-control ${errorsEdit.cor?.message != null ? "is-invalid" : ""}`}
                       placeholder="Cor"
                       id="exampleInputEmail1"
                       aria-describedby="emailHelp" />
@@ -608,11 +663,11 @@ const EstoquePage = () => {
                       Marca
                     </label>
                     <input
-                      {...register("marca", { required: { value: true, message: "Campo Necessário!" } })}
-                      className={`form-control ${errors.marca?.message != null ? "is-invalid" : ""}`}
+                      {...registerEdit("marca", { required: { value: true, message: "Campo Necessário!" } })}
+                      className={`form-control ${errorsEdit.marca?.message != null ? "is-invalid" : ""}`}
                       defaultValue={ProdutoEditing?.marca}
                     >
-                
+
                     </input>
 
                   </div>
@@ -626,10 +681,10 @@ const EstoquePage = () => {
                       Estoque Atual
                     </label>
                     <input
-                      {...register("estoque", { required: { value: true, message: "Campo Necessário!" } })}
+                      {...registerEdit("estoque", { required: { value: true, message: "Campo Necessário!" } })}
                       type="number"
                       defaultValue={ProdutoEditing?.estoque}
-                      className={`form-control ${errors.estoque?.message != null ? "is-invalid" : ""}`}
+                      className={`form-control ${errorsEdit.estoque?.message != null ? "is-invalid" : ""}`}
                       id="exampleInputEmail1"
                       aria-describedby="emailHelp" />
                   </div>
@@ -640,10 +695,10 @@ const EstoquePage = () => {
                       Estoque total
                     </label>
                     <input
-                      {...register("estoqueTotal", { required: { value: true, message: "Campo Necessário!" } })}
+                      {...registerEdit("estoqueTotal", { required: { value: true, message: "Campo Necessário!" } })}
                       type="number"
                       defaultValue={ProdutoEditing?.estoqueTotal}
-                      className={`form-control ${errors.estoque?.message != null ? "is-invalid" : ""}`}
+                      className={`form-control ${errorsEdit.estoque?.message != null ? "is-invalid" : ""}`}
                       id="exampleInputEmail1"
                       aria-describedby="emailHelp" />
                   </div>
@@ -660,8 +715,8 @@ const EstoquePage = () => {
                       defaultValue={ProdutoEditing?.preco}
                       placeholder="R$ 0.00"
                       intlConfig={{ locale: 'pt-BR', currency: 'BRL' }}
-                      {...register("precoDisplay", { required: { value: true, message: "Campo Necessário!" } })}
-                      className={`form-control ${errors.precoDisplay?.message != null ? "is-invalid" : ""}`}
+                      {...registerEdit("precoDisplay", { required: { value: true, message: "Campo Necessário!" } })}
+                      className={`form-control ${errorsEdit.precoDisplay?.message != null ? "is-invalid" : ""}`}
                     >
                     </CurrencyInput>
                   </div>
@@ -670,9 +725,8 @@ const EstoquePage = () => {
                   <button className="btn btn-danger mx-1" type="button" onClick={ModalEditarProdutoCancelar}>Cancelar</button>
                   <button className="btn btn-primary mx-1" placeholder="" type="submit"> Alterar Produto </button>
                 </div>
-              </form>}
-
-
+              </form>
+            }
           </DialogContent>
         </Card>}
 
@@ -702,147 +756,185 @@ const EstoquePage = () => {
 
           {!isLoading &&
             <form onSubmit={handleSubmit(onSubmit)}>
-              <div className="row">
-                <div className="col-6 mb-3">
-                  <input type="hidden" value={userData?.Id} {...register("usuarioId")} />
-                  <label
-                    htmlFor="exampleInputPassword1"
-                    className="form-label"
-                  >Código
-                  </label>
-                  <input
-                    {...register("codigo", { required: { value: true, message: "Campo Necessário!" } })}
-                    type="text"
-                    placeholder="Código"
-                    className={`form-control ${errors.codigo?.message != null ? "is-invalid" : ""}`}
-                    id="exampleInputPassword1" />
-                  {errors.codigo && <p className="text-danger">{errors.codigo.message}</p>}
-                </div>
-                <div className="col-6 mb-3">
-                  <label htmlFor="exampleInputEmail1" className="form-label">Descrição</label>
-                  <input {...register("descricao", { required: { value: true, message: "Campo Necessário!" } })}
-                    type="text"
-                    placeholder="Descrição"
-                    className={`form-control ${errors.descricao?.message != null ? "is-invalid" : ""}`}
-                    id="exampleInputEmail1"
-                    aria-describedby="emailHelp" />
-                  {errors.descricao && <p className="text-danger">{errors.descricao?.message}</p>}
+
+              <div>
+                {fields.map((item, index) => {
+                  var errorControls = errors.controls;
+
+                  return (
+                    <Accordion key={item.id} defaultExpanded={true}>
+                      <AccordionSummary
+                        expandIcon={<FontAwesomeIcon icon={faChevronDown} size={'1x'} />}
+                        aria-controls={`produto-${index}-content`}
+                        id={`produto-${index}-header`}
+                      >
+                        <Typography>
+                          <button className="btn btn-danger mx-1" type="button" onClick={(ev) => removerProdutoCriar(ev, index)}><FontAwesomeIcon icon={faMinus} size={'1x'} /></button>
+                          Produto - {index + 1}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <div className="row">
+                          <div className="col-6 mb-3">
+                            <input type="hidden" value={userData?.Id} {...register(`controls.${index}.usuarioId`)} />
+                            <label className="form-label">Código</label>
+                            <input
+                              {...register(`controls.${index}.codigo`, { required: { value: true, message: "Campo Necessário!" } })}
+                              type="text"
+                              placeholder="Código"
+                              className={`form-control ${errorControls && errorControls[index]?.codigo != null ? "is-invalid" : ""}`}
+                            />
+                            {errorControls && errorControls[index]?.codigo &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.codigo?.message}</p>
+                            }
+                          </div>
+                          <div className="col-6 mb-3">
+                            <label className="form-label">Descrição</label>
+                            <input {...register(`controls.${index}.descricao`, { required: { value: true, message: "Campo Necessário!" } })}
+                              type="text"
+                              placeholder="Descrição"
+                              className={`form-control ${errorControls && errorControls[index]?.descricao != null ? "is-invalid" : ""}`}
+                              aria-describedby="emailHelp" />
+                            {errorControls && errorControls[index]?.descricao &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.descricao?.message}</p>
+                            }
+                          </div>
+                          <div className="col-3 mb-3">
+                            <label className="form-label">Tamanho</label>
+                            <input
+                              {...register(`controls.${index}.tamanho`, { required: { value: true, message: "Campo Necessário!" } })}
+                              type="text"
+                              className={`form-control ${errorControls && errorControls[index]?.tamanho != null ? "is-invalid" : ""}`}
+                              placeholder="Tamanho"
+                              aria-describedby="emailHelp" />
+                            {errorControls && errorControls[index]?.tamanho &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.tamanho?.message}</p>
+                            }
+                          </div>
+                          <div className="col-3 mb-3">
+                            <label className="form-label">Gênero</label>
+                            <select
+                              {...register(`controls.${index}.genero`, { required: { value: true, message: "Campo Necessário!" } })}
+                              className={`form-select ${errorControls && errorControls[index]?.genero?.message != null ? "is-invalid" : ""}`}
+                            >
+                              <option value=""  ></option>
+                              <option value="MASCULINO">Masculino</option>
+                              <option value="FEMININO">Feminino</option>
+                              <option value="SEM GENERO">Sem Gênero</option>
+                            </select>
+                            {errorControls && errorControls[index]?.genero &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.genero?.message}</p>
+                            }
+                          </div>
+                          <div className="col-3 mb-3">
+                            <label className="form-label">Cor</label>
+                            <input
+                              {...register(`controls.${index}.cor`, { required: { value: true, message: "Campo Necessário!" } })}
+                              type="text"
+                              className={`form-control ${errorControls && errorControls[index]?.cor != null ? "is-invalid" : ""}`}
+                              placeholder="Cor"
+                              aria-describedby="emailHelp" />
+                            {errorControls && errorControls[index]?.cor &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.cor?.message}</p>
+                            }
+                          </div>
+                          <div className="col-3 mb-3">
+                            <label className="form-label">Marca</label>
+                            <input
+                              {...register(`controls.${index}.marca`, { required: { value: true, message: "Campo Necessário!" } })}
+                              className={` form-control ${errorControls && errorControls[index]?.marca != null ? "is-invalid" : ""}`}
+                            />
+                            {errorControls && errorControls[index]?.marca &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.marca?.message}</p>
+                            }
+                          </div>
+                          <div className="col-4 mb-3">
+                            <label className="form-label">Estoque Total</label>
+                            <input
+                              {...register(`controls.${index}.estoqueTotal`, { required: { value: true, message: "Campo Necessário!" } })}
+                              type="number"
+                              className={` form-control ${errorControls && errorControls[index]?.estoqueTotal != null ? "is-invalid" : ""}`}
+                            />
+                            {errorControls && errorControls[index]?.estoqueTotal &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.estoqueTotal?.message}</p>
+                            }
+                          </div>
+                          <div className="col-4 mb-3">
+                            <label
+                              htmlFor="exampleInputEmail1"
+                              className="form-label">
+                              Estoque Atual
+                            </label>
+                            <input
+                              {...register(`controls.${index}.estoque`, { required: { value: true, message: "Campo Necessário!" } })}
+                              type="number"
+                              className={` form-control ${errorControls && errorControls[index]?.estoque != null ? "is-invalid" : ""}`}
+                            />
+                            {errorControls && errorControls[index]?.estoque &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.estoque?.message}</p>
+                            }
+                          </div>
+
+                          <div className="col-4 mb-3">
+                            <label className="form-label">Preço UN</label>
+                            <CurrencyInput
+                              id="input-example"
+                              decimalSeparator=","
+                              groupSeparator=""
+                              placeholder="R$ 0.00"
+                              intlConfig={{ locale: 'pt-BR', currency: 'BRL' }}
+                              onKeyDown={(e) => {
+                                if (e.ctrlKey && e.key === "Tab") {
+                                  console.log("Tab");
+                                }
+
+                              }}
+                              {...register(`controls.${index}.precoDisplay`, { required: { value: true, message: "Campo Necessário!" } })}
+                              className={` form-control ${errorControls && errorControls[index]?.precoDisplay != null ? "is-invalid" : ""}`}
+                            >
+                            </CurrencyInput>
+                            {errorControls && errorControls[index]?.precoDisplay &&
+                              <p className="text-danger">{errorControls && errorControls[index]?.precoDisplay?.message}</p>
+                            }
+                          </div>
+
+                        </div>
+                      </AccordionDetails>
+                    </Accordion>
+                  )
+                })}
+
+                <div className="d-flex justify-content-between align-items-end" style={{
+                  position: 'sticky',
+                  bottom: '-24px',
+                  background: 'white',
+                  padding: '20px 24px',
+                  margin: '6px -20px 0 -24px'
+                }}>
+                  <button className="btn btn-primary mx-1" type="button" onClick={() => append({
+                    usuarioId: '',
+                    codigo: '',
+                    descricao: '',
+                    tamanho: '',
+                    genero: '',
+                    cor: '',
+                    marca: '',
+                    estoque: '',
+                    estoqueTotal: '',
+                    precoDisplay: ''
+                  })}>Adicionar Produto</button>
+                  <div className="d-flex justify-content-end align-items-end">
+                    <button className="btn btn-danger mx-1" type="button" onClick={ModalAddProdutoCancelar}>Cancelar</button>
+                    <button className="btn btn-success mx-1" placeholder="" type="submit"> Criar Produtos </button>
+                  </div>
                 </div>
               </div>
-              <div className="row">
-                <div className="col-3 mb-3">
-                  <label htmlFor="exampleInputEmail1"
-                    className="form-label">Tamanho
-                  </label>
-                  <input
-                    {...register("tamanho", { required: { value: true, message: "Campo Necessário!" } })}
-                    type="text"
-
-                    className={`form-control ${errors.tamanho?.message != null ? "is-invalid" : ""}`}
-                    placeholder="Tamanho"
-                    id="exampleInputEmail1"
-                    aria-describedby="emailHelp" />
-                </div>
-                <div className="col-3 mb-3">
-                  <label htmlFor="exampleInputEmail1" className="form-label">Gênero</label>
-                  <select
-                    {...register("genero", { required: { value: true, message: "Campo Necessário!" } })}
-                    className={`form-select ${errors.genero?.message != null ? "is-invalid" : ""}`}
-                  >
-                    <option value=""  ></option>
-                    <option value="MASCULINO">Masculino</option>
-                    <option value="FEMININO">Feminino</option>
-                    <option value="SEM GENERO">Sem Gênero</option>
-                  </select>
-                  {errors.genero && <p className="text-danger">{errors.genero?.message}</p>}
-                </div>
-                <div className="col-3 mb-3">
-                  <label
-                    htmlFor="exampleInputEmail1"
-                    className="form-label">
-                    Cor
-                  </label>
-                  <input
-                    {...register("cor", { required: { value: true, message: "Campo Necessário!" } })}
-                    type="text"
-                    className={`form-control ${errors.cor?.message != null ? "is-invalid" : ""}`}
-                    placeholder="Cor"
-                    id="exampleInputEmail1"
-                    aria-describedby="emailHelp" />
-                </div>
-                <div className="col-3 mb-3">
-                  <label
-                    htmlFor="exampleInputEmail1"
-                    className="form-label">
-                    Marca
-                  </label>
-                  <input
-                    {...register("marca", { required: { value: true, message: "Campo Necessário!" } })}
-                    className={` form-control ${errors.marca?.message != null ? "is-invalid" : ""}`}
-                  >
-           
-                  </input>
-
-                </div>
-              </div>
-              <div className="row">
-              <div className="col-4 mb-3">
-                  <label
-                    htmlFor="exampleInputEmail1"
-                    className="form-label">
-                    Estoque Total
-                  </label>
-
-                  <input
-                    {...register("estoqueTotal", { required: { value: true, message: "Campo Necessário!" } })}
-                    type="number"
-                    className={`form-control ${errors.estoque?.message != null ? "is-invalid" : ""}`}
-                    id="exampleInputEmail1"
-                    aria-describedby="emailHelp" />
-                </div>
-                <div className="col-4 mb-3">
-                  <label
-                    htmlFor="exampleInputEmail1"
-                    className="form-label">
-                    Estoque Atual
-                  </label>
-                  <input
-                    {...register("estoque", { required: { value: true, message: "Campo Necessário!" } })}
-                    type="number"
-                    className={`form-control ${errors.estoque?.message != null ? "is-invalid" : ""}`}
-                    id="exampleInputEmail1"
-                    aria-describedby="emailHelp" />
-                </div>
-         
-                <div className="col-4 mb-3">
-                  <label
-                    htmlFor="exampleInputEmail1"
-                    className="form-label">
-                    Preço UN
-                  </label>
-
-                  <CurrencyInput
-                    id="input-example"
-                    decimalSeparator=","
-                    groupSeparator=""
-                    placeholder="R$ 0.00"
-                    intlConfig={{ locale: 'pt-BR', currency: 'BRL' }}
-                    {...register("precoDisplay", { required: { value: true, message: "Campo Necessário!" } })}
-                    className={`form-control ${errors.precoDisplay?.message != null ? "is-invalid" : ""}`}
-                  >
-                  </CurrencyInput>
-                </div>
-
-              </div>
-              <div className="d-flex justify-content-end align-items-end">
-                <button className="btn btn-danger mx-1" type="button" onClick={ModalAddProdutoCancelar}>Cancelar</button>
-                <button className="btn btn-success mx-1" placeholder="" type="submit"> Criar Produto </button>
-              </div>
-            </form>}
+            </form>
+          }
         </DialogContent>
       </Dialog>
-    </Layout>
+    </Layout >
   )
 }
 
-export default EstoquePage;
+export default EstoquePage
