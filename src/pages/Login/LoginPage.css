@@ -1,0 +1,19 @@
+.login-form{
+
+    margin-top: 25vh;
+  
+
+}
+
+.custom-login-btn :hover{
+    background-color: '#053259';
+}
+
+.showPasswordBtnLogin{
+    margin-top: 2rem !important;
+}
+
+
+.mouseclick {
+    cursor: pointer;
+}

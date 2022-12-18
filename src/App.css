@@ -1,0 +1,16 @@
+.mouseclick{
+    cursor: pointer;
+}
+
+body{
+    font-family: 'Righteous', cursive;
+    background-color: #f2f2f0;
+}
+
+.bg-custom-primary{
+    background-color: #0b8ad9;
+}
+
+.bg-custom-secondary{
+    background-color: #053259;
+}

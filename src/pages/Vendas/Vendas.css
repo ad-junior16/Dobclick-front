@@ -1,0 +1,19 @@
+.datalist-input {
+    width: 50%;
+    color: black;
+}
+
+.relat {
+    display: flex;
+    background-color: darkgoldenrod;
+    color: white;    
+    border: solid 1px;
+    margin-left: 10px;
+    border-radius: 5px;
+    padding: .375rem .95rem;   
+    margin-top:  20px;
+    
+}
+
+
+
