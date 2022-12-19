@@ -165,7 +165,7 @@ const PersonsPage = () => {
             listarClientes();
             return;
         } else {
-            await axios.get<ResponseModel<any[]>>(apiURL + "/clientes/listar/" + userData.Id)
+            await axios.get<ResponseModel<any[]>>(apiURL + "usuarios/clientes/listar/" + userData.Id)
                 .then((response) => {
                     var novalista: any[] = [];
                     response.data.data?.map((prod) => {
@@ -192,7 +192,7 @@ const PersonsPage = () => {
         if (userData?.Id == undefined) {
             userData = JSON.parse(localStorage.getItem("AppUsuario") || "null") as User;
         }
-        await axios.post<ResponseModel<any[]>>(apiURL + "/clientes", { "nome": values.nome, "contato": values.contato, "userId": userData?.Id })
+        await axios.post<ResponseModel<any[]>>(apiURL + "usuarios/clientes", { "nome": values.nome, "contato": values.contato, "userId": userData?.Id })
             .then((response) => {
 
                 if (response.data.success) {

@@ -16,7 +16,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faMinus } from '@fortawesome/free-solid-svg-icons';
 import { toast, ToastContainer } from "react-toastify";
 import { useNavigate } from "react-router-dom";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import Preloader from "../../components/preloader/Preloader";
 import Layout from "../../components/layout/Layout/Layout";
 import { useFetch } from "../../hooks/useFetch";
@@ -217,7 +217,6 @@ const EstoquePage = () => {
     resetEdit();
     setopenModalEditProduto(false);
   }
-
 
   const { control, register, handleSubmit, reset, formState: { errors } } = useForm<{
     controls: {

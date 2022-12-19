@@ -25,7 +25,7 @@ export const VendasColumns = [
         }
     },
     {
-        name: "cliente",
+        name: "clienteDesc",
         label: "Cliente",
         options: {
             filter: true,

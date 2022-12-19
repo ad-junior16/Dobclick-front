@@ -25,7 +25,7 @@ export const ComprasColumns = [
         }
     },
     {
-        name: "fornecedor",
+        name: "fornecedorDesc",
         label: "Fornecedor",
         options: {
             filter: true,

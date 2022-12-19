@@ -5,6 +5,7 @@ export default class Compra {
     usuarioId?: number;
     pagamentoEfetuado?: boolean;
     formaPagamento?: number;
+    formaPagamentoDisplay?: string;
     valorCompraDisplay?: string;
     valorCompra?: number;
     fornecedor?: string;
